@@ -25,11 +25,13 @@
     }
   }
   h3 {
-    position: -webkit-sticky;
-    position: sticky;
-    top: 5rem;
+    // position: -webkit-sticky;
+    // position: sticky;
+    position: absolute;
     color: #C5C5C5;
     margin: 0;
+    line-height: 1.2em;
+
     font: {
       size: 1em;
       weight: 400;
@@ -42,18 +44,21 @@
   position: relative;
   &:first-child section{
     margin-top: -1.3em;
-    padding-bottom: 0px;
+  }
+  &:last-child section{
+    margin-top: -1.3em;
+    padding-bottom: 0;
   }
   section {
     position: relative;
 
     line-height: 1.2;
 
-    padding: 0 0 0 170px;
+    padding: 0 0 20px 170px;
     margin: -1.35rem 0 1em;
 
     @media (min-width: 62em) {
-      padding: 0 0 0 195px;
+      padding-left: 195px;
     }
 
     @media (min-width: 62em) {
@@ -97,7 +102,7 @@
         border-radius: 50%;
         position: absolute;
         left: 136px;
-        top: 3px;
+        top: 0.4em;
         z-index: 2;
 
         @media (min-width: 62em) {
