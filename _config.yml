@@ -20,7 +20,7 @@ author:
 # phone: 
 
 # homepage tiles
-tiles-source: pages # accepts "posts" or "pages"
+tiles-source: posts # accepts "posts" or "pages"
 tiles-count: 6
 
 # social settings (key must match name of font awesome icon)
@@ -42,6 +42,12 @@ markdown: kramdown
 
 sass:
   style: compressed
+
+defaults:
+  - scope:
+      path: "projects"
+    values:
+      project: "true"
 
 exclude:
 - "*.gemspec"
