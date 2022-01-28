@@ -1,0 +1,115 @@
+
+#timeline {
+  position: relative;
+  display: table; //*For Firefox
+  height: 100%;
+  margin: {
+    left: auto;
+    right: auto;
+    top: 5rem;
+  }
+  div {
+    &:after {
+      content: '';
+      width: 2px;
+      position: absolute;
+      top: .5rem;
+      bottom: 0rem;
+      left: 140px;
+      z-index: 1;
+      background: #C5C5C5;
+
+      @media (min-width: 62em) {
+        left: 200px;
+      }
+    }
+  }
+  h3 {
+    position: -webkit-sticky;
+    position: sticky;
+    top: 5rem;
+    color: #C5C5C5;
+    margin: 0;
+    font: {
+      size: 1em;
+      weight: 400;
+    }
+    @media (min-width: 62em) {
+      font-size: 1.1em;
+    }
+  }
+  section.year {
+  position: relative;
+  &:first-child section{
+    margin-top: -1.3em;
+    padding-bottom: 0px;
+  }
+  section {
+    position: relative;
+
+    line-height: 1.2;
+
+    padding: 0 0 0 170px;
+    margin: -1.35rem 0 1em;
+
+    @media (min-width: 62em) {
+      padding: 0 0 0 195px;
+    }
+
+    @media (min-width: 62em) {
+      font-size: 1.1em;
+    }
+  
+    h5 {
+      font-weight: 400;
+    }
+
+    h4, h5 {
+      margin: 0;
+      font: {
+        size: .9em;
+      }
+
+
+      line-height: 1.2em;
+      color: #C5C5C5;
+      @media (min-width: 62em) {
+        font-size: 1em;
+      }
+    }
+    ul {
+      list-style-type: none;
+      font-size: 1em;
+      @media (min-width: 62em) {
+        font-size: 1.1em;
+      }
+      &:last-child {
+        margin: {
+          bottom: 0;
+        }
+      }
+      &:first-of-type:after {
+        content: '';
+        width: 10px;
+        height: 10px;
+        background: #C5C5C5;
+        border: 2px solid #FFFFFF;
+        border-radius: 50%;
+        position: absolute;
+        left: 136px;
+        top: 3px;
+        z-index: 2;
+
+        @media (min-width: 62em) {
+          left: 196px;
+        }
+      }
+      li {
+        &:not(:first-child) {
+          margin-top: .5rem;
+        }
+      }
+    }
+  }
+}
+}

@@ -2,16 +2,22 @@
 title: Guilhem Niot
 subtitle: 
 email: guilhem@gniot.fr
-description: # A responsive site template designed by HTML5 Up<br /> and released under the Creative Commons.
+formspree: f/xrgjpgdn
+description: >
+  I am a computer science master student at ENS de Lyon, France, and currently in a double diploma program at EPFL, Switzerland.
+  <br/><br/>
+  My interests are cybersecurity, cryptography, privacy and software engineering. 
 baseurl: "/forty-jekyll-theme" # the subpath of your site, e.g. /blog
 url: # the base hostname & protocol for your site
 author:
-street_address: Route de Chavannes 44
-city: Lausanne
-state: Vaud
-zip_code: 1007
-country: Switzerland
-phone: +33 6 40 40 34 29
+
+
+# street_address: 
+# city:
+# state:
+# zip_code:
+# country:
+# phone: 
 
 # homepage tiles
 tiles-source: pages # accepts "posts" or "pages"
