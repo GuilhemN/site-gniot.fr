@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8"?><feed xmlns="http://www.w3.org/2005/Atom" ><generator uri="https://jekyllrb.com/" version="4.4.1">Jekyll</generator><link href="/feed.xml" rel="self" type="application/atom+xml" /><link href="/" rel="alternate" type="text/html" /><updated>2026-08-19T20:46:27+00:00</updated><id>/feed.xml</id><title type="html">Guilhem Niot</title><subtitle>I&apos;m Guilhem Niot, this is my personal web page! You can find a quick summary of my work on cryptography and cybersecurity topics.</subtitle><entry><title type="html">Write-up PwnMe 2025: Solving the Mirror Hash challenge</title><link href="/2025/03/03/ctf-writeup.html" rel="alternate" type="text/html" title="Write-up PwnMe 2025: Solving the Mirror Hash challenge" /><published>2025-03-03T00:00:00+00:00</published><updated>2025-03-03T00:00:00+00:00</updated><id>/2025/03/03/ctf-writeup</id><content type="html" xml:base="/2025/03/03/ctf-writeup.html"><![CDATA[<p>I participated to the PwnMe CTF 2025 this weekend (02/03/2025), and I thought it would be fun to write about one of its CRYPTO challenges that confused many: Mirror Hash. It was rated as a Hard challenge and was worth 500 points during the competition.</p>
+
+<p>Before all, you can retrieve the sources of this challenge below:</p>
+<center>
+<a href="/assets/ctf/2025-PwnMe-MirrorHash/challenge.py" class="btn" role="button" target="_blank" style="font-size:12px;">challenge.py</a>
+<a href="/assets/ctf/2025-PwnMe-MirrorHash/Hack.zip" class="btn" role="button" target="_blank" style="font-size:12px;">Hack.zip</a>
+</center>
+
+<p><br /></p>
+
+<h4 id="the-challenge-finding-a-collision-for-a-custom-hash">The challenge: finding a collision for a custom hash</h4>
+
+<p>In this challenge, we are provided with the python script <em>challenge.py</em> that is used on the PwnMe server and an archive <em>Hack.zip</em>. The goal is to interact appropriately with the script to retrieve a flag.</p>
+
+<p>Having a first glance at <em>challenge.py</em>, we observe that it implements a custom hash function that is used to hash byte strings of arbitrary length, i.e. it deterministically derives a value from them, (hopefully) with cryptographic guarantees. However, hash functions are known to be hard to design… In this case, looking further in the script, we are asked to break the collision resistance of this hash function in order to get the flag. In more concrete terms, we have to come up with a new file for which the custom hash provides the same value as for the provided file <em>Hack.zip</em>.</p>
+
+<p>The first thing to do now is to understand in detail the custom hash function provided to see if we notice any weakness.</p>
+
+<h4 id="how-does-the-provided-custom-hash-works">How does the provided custom hash works?</h4>
+
+<p>Let’s look at how the hash function is implemented!</p>
+
+<figure class="highlight">
+  <pre><code class="language-python" data-lang="python"><table class="rouge-table"><tbody><tr><td class="gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+</pre></td><td class="code"><pre><span class="kn">import</span> <span class="n">hashlib</span>
+<span class="kn">import</span> <span class="n">struct</span>
+<span class="kn">from</span> <span class="n">secret</span> <span class="kn">import</span> <span class="n">FLAG</span>
+
+<span class="k">class</span> <span class="nc">CustomSHA</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="n">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">):</span>
+        <span class="n">self</span><span class="p">.</span><span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span> <span class="o">=</span> <span class="n">data</span>
+
+    <span class="k">def</span> <span class="nf">process</span><span class="p">(</span><span class="n">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">h0</span> <span class="o">=</span> <span class="mh">0x674523EFCD</span><span class="p">.</span><span class="nf">to_bytes</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="n">byteorder</span><span class="o">=</span><span class="sh">'</span><span class="s">big</span><span class="sh">'</span><span class="p">)</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">h0</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">self</span><span class="p">.</span><span class="nf">preprocess</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nf">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nf">len</span><span class="p">(</span><span class="n">data</span><span class="p">),</span> <span class="mi">8</span><span class="p">):</span>
+            <span class="n">chunk</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span><span class="o">+</span><span class="mi">8</span><span class="p">]</span>
+
+            <span class="n">h</span> <span class="o">=</span> <span class="n">hashlib</span><span class="p">.</span><span class="nf">sha256</span><span class="p">(</span><span class="n">chunk</span> <span class="o">+</span> <span class="n">h</span><span class="p">).</span><span class="nf">digest</span><span class="p">()[:</span><span class="mi">5</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="sh">'</span><span class="si">{</span><span class="n">h</span><span class="p">.</span><span class="nf">hex</span><span class="p">()</span><span class="si">}</span><span class="sh">'</span>
+
+    <span class="k">def</span> <span class="nf">preprocess</span><span class="p">(</span><span class="n">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">self</span><span class="p">.</span><span class="n">data</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nf">bytearray</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+        <span class="n">data</span><span class="p">.</span><span class="nf">append</span><span class="p">(</span><span class="mh">0x80</span><span class="p">)</span>
+        <span class="k">while</span> <span class="nf">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">%</span> <span class="mi">8</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">data</span><span class="p">.</span><span class="nf">append</span><span class="p">(</span><span class="mh">0x00</span><span class="p">)</span>
+
+        <span class="n">data</span> <span class="o">+=</span> <span class="n">struct</span><span class="p">.</span><span class="nf">pack</span><span class="p">(</span><span class="sh">'</span><span class="s">&gt;Q</span><span class="sh">'</span><span class="p">,</span> <span class="mi">8</span> <span class="o">*</span> <span class="nf">len</span><span class="p">(</span><span class="n">self</span><span class="p">.</span><span class="n">data</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="nf">bytes</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+
+    <span class="k">def</span> <span class="nf">sha_custom</span><span class="p">(</span><span class="n">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">self</span><span class="p">.</span><span class="nf">process</span><span class="p">()</span>
+
+<span class="k">with</span> <span class="nf">open</span><span class="p">(</span><span class="sh">"</span><span class="s">Hack.zip</span><span class="sh">"</span><span class="p">,</span> <span class="sh">"</span><span class="s">rb</span><span class="sh">"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">data_hack</span> <span class="o">=</span> <span class="n">f</span><span class="p">.</span><span class="nf">read</span><span class="p">()</span>
+    <span class="nc">CustomSHA</span><span class="p">(</span><span class="n">data_hack</span><span class="p">)</span>
+    <span class="n">sha_custom_hack</span> <span class="o">=</span> <span class="nc">CustomSHA</span><span class="p">(</span><span class="n">data_hack</span><span class="p">).</span><span class="nf">sha_custom</span><span class="p">()</span>
+</pre></td></tr></tbody></table></code></pre>
+</figure>
+
+<p>It takes as input an array of bytes, and it first preprocesses it:</p>
+<ol>
+  <li>It adds a special character and padding at the end to extend the array of bytes to a length multiple of 8.</li>
+  <li>It also encodes the size of the original bytearray at the end. We will see later that this plays a crucial role in preventing trivial attacks.</li>
+</ol>
+
+<p>Then, the actual hashing starts. It starts from a fixed initial hash \(h_0\), and then it derives sequentially a new hash for each block of 8 bytes \(c\) of the input by computing \(\mathsf{SHA256}(c || h)\) assuming \(h\) was the hash of the previous iteration. Crucially, at each iteration, it only keeps 5 bytes of the \(\mathsf{SHA256}\) output.</p>
+
+<p>Eventually the final file hash is the last \(h\). Note that although it includes only the last \(h\), the inclusion of the previous \(h\) in each iteration ensures a dependency on every byte of the input.</p>
+
+<p>Here’s a simplified visualization of the hashing of <em>Hack.zip</em>, splitting its (preprocessed) content in blocks \(c_i\).</p>
+
+<p><img src="/assets/ctf/2025-PwnMe-MirrorHash/draw0.svg" class="illustration" /></p>
+
+<h4 id="can-we-find-a-weakness">Can we find a weakness?</h4>
+
+<p>A pretty straightforward weakness we can notice is the fact that only 5 bytes of \(\mathsf{SHA256}\) are used… This means there are \(2^{5\cdot 8} = 2^{40}\) possible values for the final hash.</p>
+
+<p>A possible strategy to solve this challenge could be to try random files until we get the same final hash. Assuming that \(\mathsf{SHA256}\) outputs random looking bits, this would require on average \(2^{40}\) attempts. With enough computation power and time this actually could work. However, in the context of this challenge we had limited time and wanted a faster solution.</p>
+
+<p>Another strategy we could think of is to exploit the <a href="https://en.wikipedia.org/wiki/Birthday_problem">Birthday paradox</a>, and also attack intermediate values of \(h\). Consider a space of dimension \(2^n\). The birthday paradox states that if you sample uniformly \(2^{n/2}\) elements in that space, there’s a good chance that two will be equal. Applied to hash functions, it implies that for a hash function with \(n\) bits in output, you can find a collision (two inputs with same output) after roughly \(2^{n/2}\) random samples.</p>
+
+<p>For our case, we could for instance try to sample random bytes \(c’\), concatenate them with \(h_0\) to compute \(h’ = \mathsf{SHA256}(c || h_0)\) until there exists an \(h_k = h’\) that was also computed during the hashing of <em>Hack.zip</em>. Then, the hope would be to simply replace by \(c’\) the bytes of <em>Hack.zip</em> used until \(h_k\) was derived. <em>Hack.zip</em> having \(1,927,317\approx 2^{21}\) blocks, this technique will very quickly find such \(h’\).</p>
+
+<p><img src="/assets/ctf/2025-PwnMe-MirrorHash/draw1.svg" class="illustration" /></p>
+
+<p>Sadly, recall from ealier that the custom hash function includes the size of the file at the end of the buffer used to derive the \(h\)… Since this technique will produce a file of lower size than <em>Hack.zip</em>, the last bytes of the sequence will also change and the final hash will differ.</p>
+
+<h4 id="hmmm">Hmmm…</h4>
+
+<p>At this point, we may feel a bit sad that our initial attempts failed.</p>
+
+<p>But not all is lost… We can realized that the above strategy would have worked had we been able to preserve the same file size!</p>
+
+<p>In the above example, we looked for a collision with a single \(c’\) and starting at the hash \(h_0\). But, we can realize that we could have started at any hash \(h_i\) in the chain of hashes of <em>Hack.zip</em>, and we could have used several blocks.</p>
+
+<p>Could we for instance extend the file instead of reducing it? Sure! Just pick some random blocks before looking for a collision.</p>
+
+<p>Wait… what if we combine file extensions and file reductions? Is it possible?? In fact, we just need to find successive collisions in the chain either reducing or extending the file with the above strategy. Say we found a collision between the blocks \(h_i\) and \(h_{i’}\), then we can look for a new collision starting from hash \(h_{i’+1}\) ensuring that we can safely combine them.</p>
+
+<p><img src="/assets/ctf/2025-PwnMe-MirrorHash/draw2.svg" class="illustration" /></p>
+
+<p>Once, we get enough of these independent extension/reduction buffers, it suffices to find a subset of these modifications such that the length of the file is not affected. We can see this as an instance of the <a href="https://en.wikipedia.org/wiki/Subset_sum_problem">Subset sum problem</a>: we are looking for a set of indexes \(S\) such that \(\sum_{i\in S}\delta_i = 0\). While this problem is NP-hard, for small dimensions we can simply solve it with dynamic programming.</p>
+
+<p>And that’s it! Once we have such a subset, we can just apply the corresponding updates to <em>Hack.zip</em> to obtain a file with the same chain of \(h_i\), and of same size ensuring that the last block also does not change and the final hash is identical to <em>Hack.zip</em>.</p>
+
+<h4 id="lets-program-it">Let’s program it!</h4>
+
+<p>First, we program a function that computes all the \(h_i\) given a byte string.</p>
+
+<figure class="highlight">
+  <pre><code class="language-python" data-lang="python"><span class="c1"># Compute all the h_i for a given data string
+</span><span class="k">def</span> <span class="nf">compute_chain_h</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="nf">bytearray</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">hs</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">h0</span> <span class="o">=</span> <span class="mh">0x674523EFCD</span><span class="p">.</span><span class="nf">to_bytes</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="n">byteorder</span><span class="o">=</span><span class="sh">'</span><span class="s">big</span><span class="sh">'</span><span class="p">)</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">h0</span>
+    <span class="n">hs</span><span class="p">.</span><span class="nf">append</span><span class="p">(</span><span class="n">h0</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nf">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nf">len</span><span class="p">(</span><span class="n">data</span><span class="p">),</span> <span class="mi">8</span><span class="p">):</span>
+        <span class="n">chunk</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span><span class="o">+</span><span class="mi">8</span><span class="p">]</span>
+
+        <span class="n">h</span> <span class="o">=</span> <span class="n">hashlib</span><span class="p">.</span><span class="nf">sha256</span><span class="p">(</span><span class="n">chunk</span> <span class="o">+</span> <span class="n">h</span><span class="p">).</span><span class="nf">digest</span><span class="p">()[:</span><span class="mi">5</span><span class="p">]</span>
+        <span class="n">hs</span><span class="p">.</span><span class="nf">append</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">hs</span>
+
+<span class="n">hshack</span> <span class="o">=</span> <span class="nf">compute_chain_h</span><span class="p">(</span><span class="n">data_hack</span><span class="p">)</span></code></pre>
+</figure>
+
+<p>Then, we program a function that can find a collision as we described before for a target buffer of a given size. We simply sample random buffers until we find a hash \(h\) that is present in an input array hs.</p>
+
+<figure class="highlight">
+  <pre><code class="language-python" data-lang="python"><span class="sh">"""</span><span class="s">
+Finds a buffer of size length, such that it hashes to one
+of the values in hs (starting from hstart).
+</span><span class="sh">"""</span>
+<span class="k">def</span> <span class="nf">find_collision</span><span class="p">(</span><span class="n">hstart</span><span class="p">,</span> <span class="n">hs</span><span class="p">,</span> <span class="n">length</span> <span class="o">=</span> <span class="mi">1</span><span class="p">):</span>
+    <span class="n">buf</span> <span class="o">=</span> <span class="nf">bytearray</span><span class="p">()</span>
+    <span class="n">hset</span> <span class="o">=</span> <span class="nf">set</span><span class="p">(</span><span class="n">hs</span><span class="p">)</span>
+
+    <span class="n">h</span> <span class="o">=</span> <span class="n">hstart</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nf">range</span><span class="p">(</span><span class="n">length</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">chunk</span> <span class="o">=</span> <span class="nf">bytearray</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span>
+        <span class="n">buf</span> <span class="o">+=</span> <span class="n">chunk</span>
+        <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">hashlib</span><span class="p">.</span><span class="nf">sha256</span><span class="p">(</span><span class="n">chunk</span> <span class="o">+</span> <span class="n">h</span><span class="p">).</span><span class="nf">digest</span><span class="p">()[:</span><span class="mi">5</span><span class="p">]</span>
+
+    <span class="n">i</span><span class="o">=</span><span class="mi">0</span>
+    <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+        <span class="n">chunk</span> <span class="o">=</span> <span class="nf">bytearray</span><span class="p">(</span><span class="n">i</span><span class="p">.</span><span class="nf">to_bytes</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="n">byteorder</span><span class="o">=</span><span class="sh">'</span><span class="s">big</span><span class="sh">'</span><span class="p">))</span>
+        <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">h2</span> <span class="o">=</span> <span class="n">hashlib</span><span class="p">.</span><span class="nf">sha256</span><span class="p">(</span><span class="n">chunk</span> <span class="o">+</span> <span class="n">h</span><span class="p">).</span><span class="nf">digest</span><span class="p">()[:</span><span class="mi">5</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">h2</span> <span class="ow">in</span> <span class="n">hset</span><span class="p">:</span>
+            <span class="n">buf</span> <span class="o">+=</span> <span class="n">chunk</span>
+            <span class="k">return</span> <span class="n">buf</span><span class="p">,</span> <span class="n">hs</span><span class="p">.</span><span class="nf">index</span><span class="p">(</span><span class="n">h2</span><span class="p">)</span></code></pre>
+</figure>
+
+<p>Now we have what we need to find the collisions we talked so much about! Let’s say we will always look for collisions only among the next 20,000 blocks, and we will consider new buffers of 10000 blocks. Then, we can hope that we will obtain both buffers that will reduce the file size, and buffers that will increase it.</p>
+
+<figure class="highlight">
+  <pre><code class="language-python" data-lang="python"><span class="n">intervals</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">index0</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nf">range</span><span class="p">(</span><span class="mi">18</span><span class="p">):</span>
+    <span class="n">buf</span><span class="p">,</span> <span class="n">index</span> <span class="o">=</span> <span class="nf">find_collision</span><span class="p">(</span><span class="n">hshack</span><span class="p">[</span><span class="n">index0</span><span class="p">],</span> <span class="n">hshack</span><span class="p">[</span><span class="n">index0</span><span class="p">:</span><span class="n">index0</span><span class="o">+</span><span class="mi">20000</span><span class="p">],</span> <span class="n">length</span><span class="o">=</span><span class="mi">10000</span><span class="p">)</span>
+    <span class="n">intervals</span><span class="p">.</span><span class="nf">append</span><span class="p">((</span><span class="n">index0</span><span class="p">,</span> <span class="n">index0</span><span class="o">+</span><span class="n">index</span><span class="p">,</span> <span class="n">buf</span><span class="p">))</span>
+    <span class="n">index0</span> <span class="o">+=</span> <span class="n">index</span>
+    <span class="nf">print</span><span class="p">(</span><span class="mi">10000</span><span class="o">-</span><span class="n">index</span><span class="p">)</span>
+
+<span class="c1"># produces [-3367, -2767, 3435, -4605, -7649, -7345, 245,
+# -5974, -8524, -689, 7603, 4968, -8475, -8854, 2893, 
+# -9943, -4385, -779]</span></code></pre>
+</figure>
+
+<p>We now simply need to solve the Subset sum problem with dynamic programming! We can do so by computing all the sums of \(k+1\) integers from the sums of \(k\) integers, plus eventually the last one.</p>
+
+<figure class="highlight">
+  <pre><code class="language-python" data-lang="python"><span class="n">diffs</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="nf">for </span><span class="p">(</span><span class="n">i0</span><span class="p">,</span> <span class="n">i1</span><span class="p">,</span> <span class="n">buf</span><span class="p">)</span> <span class="ow">in</span> <span class="n">intervals</span><span class="p">:</span>
+    <span class="n">diffs</span><span class="p">.</span><span class="nf">append</span><span class="p">(</span><span class="nf">len</span><span class="p">(</span><span class="n">buf</span><span class="p">)</span><span class="o">//</span><span class="mi">8</span> <span class="o">-</span> <span class="p">(</span><span class="n">i1</span><span class="o">-</span><span class="n">i0</span><span class="p">))</span>
+
+<span class="n">sums</span> <span class="o">=</span> <span class="nf">set</span><span class="p">()</span>
+<span class="n">sols</span> <span class="o">=</span> <span class="nf">dict</span><span class="p">()</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nf">enumerate</span><span class="p">(</span><span class="n">diffs</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="nf">list</span><span class="p">(</span><span class="n">sums</span><span class="p">):</span>
+        <span class="n">sums</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="n">u</span><span class="o">+</span><span class="n">v</span><span class="p">)</span>
+        <span class="n">sols</span><span class="p">[</span><span class="n">u</span><span class="o">+</span><span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="n">sols</span><span class="p">[</span><span class="n">u</span><span class="p">].</span><span class="nf">copy</span><span class="p">()</span>
+        <span class="n">sols</span><span class="p">[</span><span class="n">u</span><span class="o">+</span><span class="n">v</span><span class="p">].</span><span class="nf">add</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+    <span class="n">sums</span><span class="p">.</span><span class="nf">add</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+    <span class="n">sols</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="nf">set</span><span class="p">([</span><span class="n">i</span><span class="p">])</span>
+    
+<span class="n">sol</span> <span class="o">=</span> <span class="nf">list</span><span class="p">(</span><span class="n">sols</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="n">sol</span><span class="p">.</span><span class="nf">sort</span><span class="p">()</span>
+<span class="nf">print</span><span class="p">(</span><span class="n">sol</span><span class="p">)</span>
+<span class="c1"># outputs [1, 2, 10, 11, 13, 16]</span></code></pre>
+</figure>
+
+<p>Eventually, it just remains to apply the subset of modifications we found to <em>Hack.zip</em> to find a new file with the same hash. We also encode the output in json to satisfy the format used in <em>challenge.py</em></p>
+
+<figure class="highlight">
+  <pre><code class="language-python" data-lang="python"><span class="k">def</span> <span class="nf">replace_chain</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">v</span><span class="p">):</span>
+    <span class="p">(</span><span class="n">i0</span><span class="p">,</span> <span class="n">i1</span><span class="p">,</span> <span class="n">buf</span><span class="p">)</span> <span class="o">=</span> <span class="n">v</span>
+    <span class="n">databis</span> <span class="o">=</span> <span class="n">data</span><span class="p">[:</span><span class="n">i0</span><span class="o">*</span><span class="mi">8</span><span class="p">]</span> <span class="o">+</span> <span class="n">buf</span> <span class="o">+</span> <span class="n">data</span><span class="p">[</span><span class="n">i1</span><span class="o">*</span><span class="mi">8</span><span class="p">:]</span>
+    <span class="k">return</span> <span class="n">databis</span>
+
+<span class="n">data_final</span> <span class="o">=</span> <span class="n">data_hack</span><span class="p">[:]</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">sol</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+    <span class="n">data_final</span> <span class="o">=</span> <span class="nf">replace_chain</span><span class="p">(</span><span class="n">data_final</span><span class="p">,</span> <span class="n">intervals</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+
+<span class="n">data_final</span> <span class="o">=</span> <span class="nf">bytes</span><span class="p">(</span><span class="n">data_final</span><span class="p">)</span>
+
+<span class="kn">import</span> <span class="n">json</span>
+
+<span class="n">j</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="sh">"</span><span class="s">action</span><span class="sh">"</span><span class="p">:</span><span class="sh">"</span><span class="s">hash</span><span class="sh">"</span><span class="p">,</span>
+    <span class="sh">"</span><span class="s">data</span><span class="sh">"</span><span class="p">:</span> <span class="n">data_final</span><span class="p">.</span><span class="nf">hex</span><span class="p">(),</span>
+<span class="p">}</span>
+
+<span class="c1"># Serializing json
+</span><span class="n">json_object</span> <span class="o">=</span> <span class="n">json</span><span class="p">.</span><span class="nf">dumps</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
+<span class="k">with</span> <span class="nf">open</span><span class="p">(</span><span class="sh">"</span><span class="s">response.json</span><span class="sh">"</span><span class="p">,</span> <span class="sh">"</span><span class="s">w</span><span class="sh">"</span><span class="p">)</span> <span class="k">as</span> <span class="n">outfile</span><span class="p">:</span>
+    <span class="n">outfile</span><span class="p">.</span><span class="nf">write</span><span class="p">(</span><span class="n">json_object</span><span class="p">)</span></code></pre>
+</figure>
+
+<p>And that is it! I hope you also had fun solving this challenge :)</p>
+
+<p>You can also download a step-by-step Jupyter Notebook below:</p>
+<center>
+<a href="/assets/ctf/2025-PwnMe-MirrorHash/solve.ipynb" class="btn" role="button" target="_blank" style="font-size:12px;">Jupyter Notebook solution</a>
+</center>]]></content><author><name></name></author><summary type="html"><![CDATA[I participated to the PwnMe CTF 2025 this weekend (02/03/2025), and I thought it would be fun to write about one of its CRYPTO challenges that confused many: Mirror Hash. It was rated as a Hard challenge and was worth 500 points during the competition.]]></summary></entry><entry><title type="html">Fighting side-channel attacks with our general toolkit: illustration with the Plover signature</title><link href="/2024/09/16/plover.html" rel="alternate" type="text/html" title="Fighting side-channel attacks with our general toolkit: illustration with the Plover signature" /><published>2024-09-16T00:00:00+00:00</published><updated>2024-09-16T00:00:00+00:00</updated><id>/2024/09/16/plover</id><content type="html" xml:base="/2024/09/16/plover.html"><![CDATA[]]></content><author><name></name></author><summary type="html"><![CDATA[]]></summary></entry></feed>
